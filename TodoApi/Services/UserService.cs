@@ -29,4 +29,16 @@ public class UserService
 
         await _repo.CreateAsync(user);
     }
+
+    public async Task<User?> LoginAsync(LoginUserRequest request)
+    {
+        var user = await _repo.GetByEmailAsync(request.Email);
+
+        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+        {
+            return null; 
+        }
+        return user; 
+    }
+
 }
