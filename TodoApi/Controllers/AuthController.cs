@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using TodoApi.DTO.Request;
+using TodoApi.DTO.Response;
 using TodoApi.Services;
 
 namespace TodoApi.Controllers;
@@ -9,10 +10,14 @@ namespace TodoApi.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly UserService _service;
+    private readonly JwtService _jwt;
+    private readonly ILogger<AuthController> _logger;
 
-    public AuthController(UserService service)
+    public AuthController(UserService service, JwtService jwt, ILogger<AuthController> logger)
     {
         _service = service;
+        _jwt = jwt;
+        _logger = logger;
     }
 
     [HttpPost("register")]
@@ -21,26 +26,63 @@ public class AuthController : ControllerBase
         try
         {
             await _service.RegisterAsync(request);
-            return Ok(new { message = "User registered successfully" });
+            return Ok(new ApiResponse<AuthPayload>
+            {
+                Success = true,
+                Message = "Register successful"
+            });
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex) 
         {
-            return BadRequest(new { error = ex.Message });
+            _logger.LogError(ex, "Register failed for email: {Email}", request.Email); 
+
+            return BadRequest(new ApiResponse<AuthPayload>
+            {
+                Success = false,
+                Message = "Registration failed",
+                Errors = ex.Message 
+            });
         }
     }
 
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginUserRequest request)
     {
-        var user = await _service.LoginAsync(request);
-
-        if (user == null)
+        try
         {
-            return Unauthorized(new { message = "Invalid email or password" });
-        }
+            var user = await _service.LoginAsync(request);
+            if (user == null)
+            {
+                return Unauthorized(new ApiResponse<AuthPayload>
+                {
+                    Success = false,
+                    Message = "Invalid email or password"
+                });
+            }
 
-        // For now, we just return a success message.
-        // In a real app, you would return a JWT Token here.
-        return Ok(new { message = "Login successful", userId = user.Id, email = user.Email });
+            var (token, expiresAt) = _jwt.GenerateToken(user);
+
+            return Ok(new ApiResponse<AuthPayload>
+            {
+                Success = true,
+                Message = "Login successful",
+                Data = new AuthPayload
+                {
+                    UserId = user.Id!,
+                    Email = user.Email,
+                    AccessToken = token,
+                    ExpiresAt = expiresAt
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Login failed for email: {Email}", request.Email);
+            return StatusCode(500, new ApiResponse<AuthPayload> 
+            { 
+                Success = false, 
+                Message = "An internal error occurred" 
+            });
+        }
     }
 }

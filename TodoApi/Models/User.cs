@@ -1,19 +1,15 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
 
-namespace TodoApi.Models
+namespace TodoApi.Models;
+
+public class User
 {
-    public class User
-    {
-        public string Id { get; set; } = null!;
+    [BsonId]
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string? Id { get; set; } 
 
-        public string Email { get; set; } = null!;
-
-        public string PasswordHash { get; set; } = null!;
-
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    }
-
-}
+    public string Email { get; set; } = null!;
+    public string PasswordHash { get; set; } = null!;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+} 
