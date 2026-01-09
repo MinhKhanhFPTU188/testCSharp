@@ -7,7 +7,7 @@ using TodoApi.Services;
 
 namespace TodoApi.Controllers;
 
-[Authorize] // Requires valid JWT Token
+[Authorize]
 [ApiController]
 [Route("api/todos")]
 public class TodoController : ControllerBase
@@ -24,41 +24,55 @@ public class TodoController : ControllerBase
     private string GetUserId() => User.FindFirst(ClaimTypes.NameIdentifier)?.Value!;
 
     [HttpGet]
-    public async Task<IActionResult> GetTodos()
-    {
-        var todos = await _service.GetUserTodosAsync(GetUserId());
-        return Ok(new ApiResponse<object>
+    public async Task<IActionResult> GetTodos() =>
+        Ok(new ApiResponse<object>
         {
             Success = true,
-            Data = todos
+            Data = await _service.GetUserTodosAsync(GetUserId())
         });
-    }
 
-    [HttpPost]
-    public async Task<IActionResult> CreateTodo([FromBody] CreateTodoRequest request)
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetTodoById(string id)
     {
-        var todo = await _service.CreateTodoAsync(GetUserId(), request);
+        var todo = await _service.GetTodoByIdAsync(id, GetUserId());
+
+        if (todo == null)
+        {
+            return NotFound(new ApiResponse<object>
+            {
+                Success = false,
+                Message = "This have been delete or it not your"
+            });
+        }
+
         return Ok(new ApiResponse<object>
         {
             Success = true,
-            Message = "Todo created",
             Data = todo
         });
     }
 
-    [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateTodo(string id, [FromBody] UpdateTodoRequest request)
+    [HttpPost("create")]
+    public async Task<IActionResult> CreateTodo([FromBody] CreateTodoRequest request) =>
+        Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Message = "Todo created",
+            Data = await _service.CreateTodoAsync(GetUserId(), request)
+        });
+
+    [HttpPost("{id}/update-content")]
+    public async Task<IActionResult> UpdateTodoContent(string id, [FromBody] UpdateTodoRequest request)
     {
-        var updatedTodo = await _service.UpdateTodoAsync(id, GetUserId(), request);
-        
-        if (updatedTodo == null)
+        var todo = await _service.UpdateTodoAsync(id, GetUserId(), request);
+        if (todo == null)
             return NotFound(new ApiResponse<object> { Success = false, Message = "Todo not found" });
 
         return Ok(new ApiResponse<object>
         {
             Success = true,
             Message = "Todo updated",
-            Data = updatedTodo
+            Data = todo
         });
     }
 
@@ -66,7 +80,6 @@ public class TodoController : ControllerBase
     public async Task<IActionResult> DeleteTodo(string id)
     {
         var success = await _service.DeleteTodoAsync(id, GetUserId());
-        
         if (!success)
             return NotFound(new ApiResponse<object> { Success = false, Message = "Todo not found" });
 

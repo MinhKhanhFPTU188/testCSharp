@@ -18,6 +18,16 @@ public class TodoService
         return await _repo.GetByUserIdAsync(userId);
     }
 
+    public async Task<Todo?> GetTodoByIdAsync(string id, string userId)
+    {
+        var todo = await _repo.GetByIdAsync(id);
+
+        if (todo == null || todo.UserId != userId)
+            return null;
+
+        return todo;
+    }
+
     public async Task<Todo> CreateTodoAsync(string userId, CreateTodoRequest request)
     {
         var todo = new Todo
@@ -36,7 +46,6 @@ public class TodoService
     {
         var todo = await _repo.GetByIdAsync(id);
 
-        // Check if todo exists and belongs to the user
         if (todo == null || todo.UserId != userId) return null;
 
         todo.Title = request.Title;
@@ -50,7 +59,7 @@ public class TodoService
     public async Task<bool> DeleteTodoAsync(string id, string userId)
     {
         var todo = await _repo.GetByIdAsync(id);
-        
+
         if (todo == null || todo.UserId != userId) return false;
 
         await _repo.DeleteAsync(id);
