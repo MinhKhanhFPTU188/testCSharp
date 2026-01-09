@@ -1,24 +1,35 @@
-import logo from './logo.svg';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import Login from './components/Login';
+import Register from './components/Register';
+import TodoList from './components/TodoList';
+import TodoDetail from './components/TodoDetail';
 import './App.css';
 
 function App() {
+  const isAuthenticated = !!localStorage.getItem('token');
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <BrowserRouter>
+      <div className="App">
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          
+          <Route 
+            path="/todos" 
+            element={isAuthenticated ? <TodoList /> : <Navigate to="/login" />} 
+          />
+          
+          <Route 
+            path="/todos/:id" 
+            element={isAuthenticated ? <TodoDetail /> : <Navigate to="/login" />} 
+          />
+          
+          <Route path="*" element={<Navigate to="/todos" />} />
+        </Routes>
+      </div>
+    </BrowserRouter>
   );
 }
 

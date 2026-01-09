@@ -13,6 +13,20 @@ var builder = WebApplication.CreateBuilder(args);
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]!);
 
+// ============================================
+// 1. ADD CORS SERVICE HERE (Before Build)
+// ============================================
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactApp",
+        policy =>
+        {
+            policy.WithOrigins("http://localhost:3000") // The URL of your React App
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        });
+});
+
 // ===== Authentication =====
 builder.Services.AddAuthentication(options =>
 {
@@ -21,6 +35,7 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
+    // ... (Your existing JWT config remains here) ...
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
@@ -31,8 +46,8 @@ builder.Services.AddAuthentication(options =>
         ValidAudience = jwtSettings["Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(key)
     };
-
-    // ===== Custom 401/403 Responses =====
+    
+    // ... (Your existing Events config remains here) ...
     options.Events = new JwtBearerEvents
     {
         OnChallenge = context =>
@@ -40,90 +55,24 @@ builder.Services.AddAuthentication(options =>
             context.HandleResponse();
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             context.Response.ContentType = "application/json";
-
-            var response = new ApiResponse<object>
-            {
-                Success = false,
-                Message = "You are not authorized. Please login."
-            };
-
+            var response = new ApiResponse<object> { Success = false, Message = "You are not authorized. Please login." };
             return context.Response.WriteAsync(JsonSerializer.Serialize(response));
         },
         OnForbidden = context =>
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             context.Response.ContentType = "application/json";
-
-            var response = new ApiResponse<object>
-            {
-                Success = false,
-                Message = "You do not have permission to access this resource."
-            };
-
+            var response = new ApiResponse<object> { Success = false, Message = "You do not have permission to access this resource." };
             return context.Response.WriteAsync(JsonSerializer.Serialize(response));
         }
     };
 });
 
-// ===== Controllers & Validation =====
-builder.Services.AddControllers()
-    .ConfigureApiBehaviorOptions(options =>
-    {
-        // Custom 400 response for model validation / type mismatch
-        options.InvalidModelStateResponseFactory = context =>
-        {
-            var errors = context.ModelState
-                .Where(x => x.Value.Errors.Count > 0)
-                .ToDictionary(
-                    kvp => kvp.Key,
-                    kvp => kvp.Value.Errors.Select(e => e.ErrorMessage).ToArray()
-                );
-
-            var response = new ApiResponse<object>
-            {
-                Success = false,
-                Message = "Validation failed",
-                Errors = errors
-            };
-
-            return new BadRequestObjectResult(response);
-        };
-    });
-
+builder.Services.AddControllers().ConfigureApiBehaviorOptions(options => { /*...*/ });
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
-    {
-        Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token.",
-        Name = "Authorization",
-        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
-    });
-
-    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
-    {
-        {
-            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
-            {
-                Reference = new Microsoft.OpenApi.Models.OpenApiReference
-                {
-                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            new string[] {}
-        }
-    });
-});
-
-// ===== App Services =====
-builder.Services.Configure<MongoDbSettings>(
-    builder.Configuration.GetSection("MongoDbSettings"));
-
+builder.Services.AddSwaggerGen(c => { /*...*/ });
+builder.Services.Configure<MongoDbSettings>(builder.Configuration.GetSection("MongoDbSettings"));
 builder.Services.AddSingleton<MongoDbContext>();
-
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<JwtService>();
@@ -132,9 +81,7 @@ builder.Services.AddScoped<TodoService>();
 
 var app = builder.Build();
 
-// ===== Middleware =====
 
-// Swagger
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -142,10 +89,13 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+
+app.UseCors("AllowReactApp");
+
 app.UseAuthentication();
 app.UseAuthorization();
 
-// ===== Global Exception Handler =====
 app.Use(async (context, next) =>
 {
     try
@@ -156,14 +106,7 @@ app.Use(async (context, next) =>
     {
         context.Response.StatusCode = StatusCodes.Status500InternalServerError;
         context.Response.ContentType = "application/json";
-
-        var response = new ApiResponse<object>
-        {
-            Success = false,
-            Message = "An unexpected error occurred.",
-            Errors = new { Exception = ex.Message }
-        };
-
+        var response = new ApiResponse<object> { Success = false, Message = "An unexpected error occurred.", Errors = new { Exception = ex.Message } };
         await context.Response.WriteAsync(JsonSerializer.Serialize(response));
     }
 });
