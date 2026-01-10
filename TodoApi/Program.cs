@@ -78,6 +78,7 @@ builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<TodoRepository>();
 builder.Services.AddScoped<TodoService>();
+builder.Services.AddSingleton<NotificationService>();
 
 var app = builder.Build();
 

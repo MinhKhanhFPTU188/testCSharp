@@ -14,11 +14,14 @@ public class TodoController : ControllerBase
 {
     private readonly TodoService _service;
     private readonly ILogger<TodoController> _logger;
+    private readonly NotificationService _notificationService;
 
-    public TodoController(TodoService service, ILogger<TodoController> logger)
+    public TodoController(TodoService service, ILogger<TodoController> logger, NotificationService notificationService)
     {
         _service = service;
+        _notificationService = notificationService;
         _logger = logger;
+
     }
 
     private string GetUserId() => User.FindFirst(ClaimTypes.NameIdentifier)?.Value!;
@@ -53,13 +56,20 @@ public class TodoController : ControllerBase
     }
 
     [HttpPost("create")]
-    public async Task<IActionResult> CreateTodo([FromBody] CreateTodoRequest request) =>
-        Ok(new ApiResponse<object>
+    public async Task<IActionResult> CreateTodo([FromBody] CreateTodoRequest request)
+    {
+        var userId = GetUserId();
+        var createdTodo = await _service.CreateTodoAsync(userId, request);
+
+        await _notificationService.NotifyUserAsync(userId, "TODO_CREATED", createdTodo);
+
+        return Ok(new ApiResponse<object>
         {
             Success = true,
             Message = "Todo created",
-            Data = await _service.CreateTodoAsync(GetUserId(), request)
+            Data = createdTodo
         });
+    }
 
     [HttpPost("{id}/update-content")]
     public async Task<IActionResult> UpdateTodoContent(string id, [FromBody] UpdateTodoRequest request)

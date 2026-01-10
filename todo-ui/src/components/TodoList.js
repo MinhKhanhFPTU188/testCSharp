@@ -1,13 +1,29 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { useNotification } from '../context/NotificationContext'; // Import Hook
 
 const TodoList = () => {
   const [todos, setTodos] = useState([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const navigate = useNavigate();
+  
+  // Access the data from the global context
+  const { lastTodoReceived } = useNotification();
 
+  // 1. Listen for updates from the Global Context
+  useEffect(() => {
+    if (lastTodoReceived) {
+      setTodos(prevTodos => {
+        // Prevent duplicates
+        if (prevTodos.some(t => t.id === lastTodoReceived.id)) return prevTodos;
+        return [...prevTodos, lastTodoReceived];
+      });
+    }
+  }, [lastTodoReceived]);
+
+  // 2. Initial Fetch
   useEffect(() => {
     fetchTodos();
   }, []);
@@ -15,9 +31,7 @@ const TodoList = () => {
   const fetchTodos = async () => {
     try {
       const response = await api.get('/todos');
-      if (response.data.success) {
-        setTodos(response.data.data);
-      }
+      if (response.data.success) setTodos(response.data.data);
     } catch (err) {
       if (err.response?.status === 401) navigate('/login');
     }
@@ -29,7 +43,7 @@ const TodoList = () => {
       await api.post('/todos/create', { title, description });
       setTitle('');
       setDescription('');
-      fetchTodos(); // Refresh list
+      // No need to alert or fetch here; the SSE Context will trigger the update
     } catch (err) {
       alert('Failed to create todo');
     }
@@ -52,6 +66,8 @@ const TodoList = () => {
 
   return (
     <div className="todo-container">
+      {/* Note: The Notification Popup is now handled in App.js via Context */}
+      
       <header className="todo-header">
         <h1>My Todos</h1>
         <button onClick={handleLogout} className="logout-btn">Logout</button>
